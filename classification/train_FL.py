@@ -97,7 +97,7 @@ if __name__ == "__main__":
     encoded_test_dataset = encoded_test_dataset[:len(encoded_test_dataset)]
 
     print("creating loader...")
-    train_loader = build_loaders(encoded_train_dataset, mode="train")
+    train_loader = build_loaders(encoded_train_dataset, mode="valid")
     val_loader = build_loaders(encoded_val_dataset, mode="valid")
     test_loader = build_loaders(encoded_test_dataset, mode="test")
 
