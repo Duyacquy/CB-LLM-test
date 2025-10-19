@@ -204,7 +204,7 @@ if __name__ == "__main__":
     test_c = torch.cat(FL_test_features, dim=0).detach().cpu()
 
     train_c, train_mean, train_std = normalize(train_c, d=0)
-    train_c = F.relu(train_c)
+    # train_c = F.relu(train_c)
 
     prefix = "./" + acs + "/" + args.dataset.replace('/', '_') + "/" + backbone + "/"
     model_name = cbl_name[3:]
@@ -212,10 +212,10 @@ if __name__ == "__main__":
     torch.save(train_std, prefix + 'train_std' + model_name)
 
     val_c, _, _ = normalize(val_c, d=0, mean=train_mean, std=train_std)
-    val_c = F.relu(val_c)
+    # val_c = F.relu(val_c)
 
     test_c, _, _ = normalize(test_c, d=0, mean=train_mean, std=train_std)
-    test_c = F.relu(test_c)
+    # test_c = F.relu(test_c)
 
 
     train_y = torch.LongTensor(encoded_train_dataset[CFG.dataset_config[args.dataset]["label_column"]])
