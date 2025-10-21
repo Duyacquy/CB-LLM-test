@@ -13,6 +13,12 @@ from utils import cos_sim_cubed, get_labels, eos_pooling
 import time
 from dataset_utils import *
 
+# from sklearn.metrics import pairwise_distances
+# from scipy.stats import pearsonr, spearmanr
+
+# parser.add_argument("--pairwise_N", type=int, default=1000,
+#                     help="số mẫu test để tính D1/D2")
+
 parser = argparse.ArgumentParser()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -297,6 +303,104 @@ if __name__ == "__main__":
                 torch.save(cbl.state_dict(), prefix + model_name + ".pt")
             else:
                 torch.save(backbone_cbl.state_dict(), prefix + model_name + ".pt")
+
+    # print("preprocessing & tokenizing test...")
+    # test_dataset = preprocess(
+    #     test_dataset,
+    #     args.dataset,
+    #     CFG.dataset_config[args.dataset]["text_column"],
+    #     CFG.dataset_config[args.dataset]["label_column"]
+    # )
+    # encoded_test_dataset = test_dataset.map(
+    #     lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]],
+    #                         padding=True, truncation=True, max_length=args.max_length),
+    #     batched=True, batch_size=len(test_dataset)
+    # )
+    # encoded_test_dataset = encoded_test_dataset.remove_columns(
+    #     [CFG.dataset_config[args.dataset]["text_column"]]
+    # )
+    # encoded_test_dataset = encoded_test_dataset[:len(encoded_test_dataset)]
+
+    # # similarity giả cho test để khớp Dataset API
+    # test_similarity = np.zeros((len(encoded_test_dataset), len(concept_set)), dtype=np.float32)
+
+    # print("creating test loader...")
+    # test_loader = build_loaders(encoded_test_dataset, test_similarity, mode="test")
+
+    # def _take_upper_tri(D: np.ndarray) -> np.ndarray:
+    # i = np.triu_indices_from(D, k=1)
+    # return D[i]
+
+    # @torch.no_grad()
+    # def _collect_H1_H2(test_loader, args, device, backbone_cbl=None, cbl=None, preLM=None):
+    #     """Trả về H1 (N,768), H2 (N,C) dạng numpy."""
+    #     H1, H2 = [], []
+    #     N = args.pairwise_N
+    #     total = 0
+
+    #     for batch in test_loader:
+    #         batch_text, _ = batch
+    #         batch_text = {k: v.to(device) for k, v in batch_text.items()}
+
+    #         if args.tune_cbl_only:
+    #             LM_out = preLM(
+    #                 input_ids=batch_text["input_ids"],
+    #                 attention_mask=batch_text["attention_mask"]
+    #             ).last_hidden_state
+    #             if args.backbone in ["roberta", "bert"]:
+    #                 h1 = LM_out[:, 0, :]
+    #             elif args.backbone == "gpt2":
+    #                 h1 = eos_pooling(LM_out, batch_text["attention_mask"])
+    #             else:
+    #                 raise Exception("backbone should be roberta or gpt2")
+    #             h2 = cbl(h1)
+    #         else:
+    #             # yêu cầu class CBL đã có method encode_and_cbl như mình đã sửa
+    #             h1, h2 = backbone_cbl.encode_and_cbl(batch_text)
+
+    #         H1.append(h1.detach().cpu().numpy())
+    #         H2.append(h2.detach().cpu().numpy())
+    #         total += h1.size(0)
+    #         if total >= N:
+    #             break
+
+    #     H1 = np.concatenate(H1, axis=0)[:N]
+    #     H2 = np.concatenate(H2, axis=0)[:N]
+    #     return H1, H2
+
+    # ==== PAIRWISE: chỉ in correlation và tỉ số D1/D2 ====
+    # print("\nRunning pairwise (correlation & D1/D2 ratio) on test set...")
+    # with torch.no_grad():
+    #     H1, H2 = _collect_H1_H2(
+    #         test_loader=test_loader,
+    #         args=args,
+    #         device=device,
+    #         backbone_cbl=None if args.tune_cbl_only else backbone_cbl,
+    #         cbl=cbl if args.tune_cbl_only else None,
+    #         preLM=preLM if args.tune_cbl_only else None
+    #     )
+
+    # for metric in ("euclidean", "cosine"):
+    #     D1 = pairwise_distances(H1, metric=metric)
+    #     D2 = pairwise_distances(H2, metric=metric)
+
+    #     v1 = _take_upper_tri(D1)
+    #     v2 = _take_upper_tri(D2)
+
+    #     # Correlations
+    #     pr, pr_p = pearsonr(v1, v2)
+    #     sr, sr_p = spearmanr(v1, v2)
+
+    #     # Ratio D1/D2 (bỏ phần tử có mẫu số ~0)
+    #     eps = 1e-12
+    #     mask = v2 > eps
+    #     ratio = v1[mask] / (v2[mask] + eps)
+
+    #     print(f"\n=== {metric.upper()} ===")
+    #     print(f"Pearson r  = {pr:.6f} (p={pr_p:.1e})")
+    #     print(f"Spearman r = {sr:.6f} (p={sr_p:.1e})")
+    #     print(f"Ratio D1/D2: mean={ratio.mean():.4f}, median={np.median(ratio):.4f}, "
+    #         f"p05={np.percentile(ratio,5):.4f}, p95={np.percentile(ratio,95):.4f}")
 
     end = time.time()
     print("time of training CBL:", (end - start) / 3600, "hours")
