@@ -325,8 +325,7 @@ med_abs = [
     "aabbbcc81", "aabbbcc82", "aabbbcc83", "aabbbcc84", "aabbbcc85",
     "aabbbcc86", "aabbbcc87", "aabbbcc88", "aabbbcc89", "aabbbcc90",
     "aabbbcc91", "aabbbcc92", "aabbbcc93", "aabbbcc94", "aabbbcc95",
-    "aabbbcc96", "aabbbcc97", "aabbbcc98", "aabbbcc99", "aabbbcc100",
-    "aabbbcc101", "aabbbcc102"
+    "aabbbcc96"
 ]
 
 
