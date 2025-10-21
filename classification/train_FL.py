@@ -54,6 +54,7 @@ if __name__ == "__main__":
     backbone = args.cbl_path.split("/")[2]
     cbl_name = args.cbl_path.split("/")[-1]
     
+    print("--------------------------------TRAIN_FL--------------------------------")
     print("loading data...")
     train_dataset, val_dataset, test_dataset = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=False)
     print("tokenizing...")
