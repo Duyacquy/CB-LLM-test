@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     print("--------------------------------TRAIN_CBL--------------------------------")
     print("loading data...")
-    train_dataset, val_dataset, test_dataset = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=True)
+    train_dataset, val_dataset, test_dataset = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=False)
     print("tokenizing...")
 
     if args.labeling == 'llm':
