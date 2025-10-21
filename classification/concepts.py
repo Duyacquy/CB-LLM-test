@@ -315,17 +315,7 @@ med_abs = [
     "aabbbcc31", "aabbbcc32", "aabbbcc33", "aabbbcc34", "aabbbcc35",
     "aabbbcc36", "aabbbcc37", "aabbbcc38", "aabbbcc39", "aabbbcc40",
     "aabbbcc41", "aabbbcc42", "aabbbcc43", "aabbbcc44", "aabbbcc45",
-    "aabbbcc46", "aabbbcc47", "aabbbcc48", "aabbbcc49", "aabbbcc50",
-    "aabbbcc51", "aabbbcc52", "aabbbcc53", "aabbbcc54", "aabbbcc55",
-    "aabbbcc56", "aabbbcc57", "aabbbcc58", "aabbbcc59", "aabbbcc60",
-    "aabbbcc61", "aabbbcc62", "aabbbcc63", "aabbbcc64", "aabbbcc65",
-    "aabbbcc66", "aabbbcc67", "aabbbcc68", "aabbbcc69", "aabbbcc70",
-    "aabbbcc71", "aabbbcc72", "aabbbcc73", "aabbbcc74", "aabbbcc75",
-    "aabbbcc76", "aabbbcc77", "aabbbcc78", "aabbbcc79", "aabbbcc80",
-    "aabbbcc81", "aabbbcc82", "aabbbcc83", "aabbbcc84", "aabbbcc85",
-    "aabbbcc86", "aabbbcc87", "aabbbcc88", "aabbbcc89", "aabbbcc90",
-    "aabbbcc91", "aabbbcc92", "aabbbcc93", "aabbbcc94", "aabbbcc95",
-    "aabbbcc96"
+    "aabbbcc46", "aabbbcc47", "aabbbcc48"
 ]
 
 
