@@ -308,9 +308,7 @@ dbpedia = ['the name of the company.', 'the location of the company', 'the found
 med_abs = [
     "aabbbcc1", "aabbbcc2", "aabbbcc3", "aabbbcc4", "aabbbcc5",
     "aabbbcc6", "aabbbcc7", "aabbbcc8", "aabbbcc9", "aabbbcc10",
-    "aabbbcc11", "aabbbcc12", "aabbbcc13", "aabbbcc14", "aabbbcc15",
-    "aabbbcc16", "aabbbcc17", "aabbbcc18", "aabbbcc19", "aabbbcc20",
-    "aabbbcc21", "aabbbcc22", "aabbbcc23", "aabbbcc24"
+    "aabbbcc11", "aabbbcc12"
 ]
 
 
