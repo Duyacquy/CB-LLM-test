@@ -298,57 +298,5 @@ if __name__ == "__main__":
             else:
                 torch.save(backbone_cbl.state_dict(), prefix + model_name + ".pt")
 
-        # ==== DIAGNOSTICS: đo S_W và S_B ====
-    print("\nRunning diagnostic on train set for SW/SB...")
-    model_path = prefix + model_name + ".pt"
-
-    # Load model tốt nhất
-    if args.tune_cbl_only:
-        cbl.load_state_dict(torch.load(model_path))
-        cbl.eval()
-    else:
-        backbone_cbl.load_state_dict(torch.load(model_path))
-        backbone_cbl.eval()
-
-    # Lấy toàn bộ embedding concept z_pred trên train
-    zs, ys = [], []
-    with torch.no_grad():
-        for batch in train_loader:
-            batch_text, batch_sim = batch
-            batch_text = {k: v.to(device) for k, v in batch_text.items()}
-            labels = np.array(batch_sim.cpu())  # chỉ để đồng bộ chiều
-
-            if args.tune_cbl_only:
-                LM_features = preLM(input_ids=batch_text["input_ids"], attention_mask=batch_text["attention_mask"]).last_hidden_state
-                if args.backbone in ["roberta", "bert"]:
-                    LM_features = LM_features[:, 0, :]
-                elif args.backbone == "gpt2":
-                    LM_features = eos_pooling(LM_features, batch_text["attention_mask"])
-                z = cbl(LM_features)
-            else:
-                z = backbone_cbl(batch_text)
-
-            zs.append(z.detach().cpu().numpy())
-            ys.append(encoded_train_dataset[CFG.dataset_config[args.dataset]["label_column"]][:z.size(0)])
-
-    z_all = np.concatenate(zs)
-    y_all = np.concatenate(ys)
-    print("z_all shape:", z_all.shape, "y_all shape:", y_all.shape)
-
-    # ==== Tính S_W và S_B ====
-    classes = np.unique(y_all)
-    mus, ncs = [], []
-    S_W, S_B = 0.0, 0.0
-    for c in classes:
-        zc = z_all[y_all == c]
-        mu_c = zc.mean(axis=0)
-        mus.append(mu_c)
-        ncs.append(len(zc))
-        S_W += ((zc - mu_c) ** 2).sum()
-    mu_all = z_all.mean(axis=0)
-    for mu_c, n_c in zip(mus, ncs):
-        S_B += n_c * ((mu_c - mu_all) ** 2).sum()
-    print(f"S_W = {S_W:.4f}, S_B = {S_B:.4f}, ratio S_W/S_B = {S_W/S_B:.4f}")
-
     end = time.time()
     print("time of training CBL:", (end - start) / 3600, "hours")

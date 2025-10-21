@@ -39,6 +39,68 @@ class RobertaCBL(nn.Module):
         x = x + projected
         return x
 
+# import torch
+# import torch.nn as nn
+# from transformers import RobertaModel
+
+# class RobertaCBL(nn.Module):
+#     def __init__(self, concept_dim, dropout):
+#         super().__init__()
+#         self.preLM = RobertaModel.from_pretrained('roberta-base')
+#         # nếu bạn muốn finetune backbone thì để True; nếu freeze thì đặt False
+#         for p in self.preLM.parameters():
+#             p.requires_grad = True
+
+#         self.projection = nn.Linear(768, concept_dim)
+#         self.gelu = nn.GELU()
+#         self.fc = nn.Linear(concept_dim, concept_dim)
+#         self.dropout = nn.Dropout(dropout)
+
+#     # --------- 1) ENCODER: lấy h1 (CLS) ----------
+#     def encode(self, t):
+#         """
+#         t: dict with 'input_ids', 'attention_mask' (B, L)
+#         return: h1 (B, 768)
+#         """
+#         out = self.preLM(
+#             input_ids=t["input_ids"],
+#             attention_mask=t["attention_mask"]
+#         ).last_hidden_state
+#         h1 = out[:, 0, :]   # CLS
+#         return h1
+
+#     # --------- 2) CBL head: h1 -> h2 ----------
+#     def cbl_head(self, h1):
+#         """
+#         h1: (B, 768)
+#         return: h2 (B, concept_dim)
+#         """
+#         projected = self.projection(h1)   # (B, C)
+#         x = self.gelu(projected)
+#         x = self.fc(x)                    # (B, C)
+#         x = self.dropout(x)
+#         x = x + projected                 # residual
+#         return x
+
+#     # --------- 3) forward: giữ API cũ (trả về h2) ----------
+#     def forward(self, t):
+#         """
+#         Trả về h2 để không làm hỏng code training hiện tại.
+#         """
+#         h1 = self.encode(t)
+#         h2 = self.cbl_head(h1)
+#         return h2
+
+#     # --------- 4) tiện ích: lấy cả h1, h2 cho đánh giá ----------
+#     @torch.no_grad()
+#     def encode_and_cbl(self, t):
+#         """
+#         Dùng ở eval: trả về (h1, h2) để tính D1, D2.
+#         """
+#         h1 = self.encode(t)
+#         h2 = self.cbl_head(h1)
+#         return h1, h2
+
 class GPT2CBL(nn.Module):
     def __init__(self, concept_dim, dropout):
         super().__init__()
