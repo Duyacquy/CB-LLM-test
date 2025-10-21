@@ -1,6 +1,7 @@
 # dump_cbl_acc_vectors.py
 import os, argparse, random, torch, numpy as np, torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel, RobertaTokenizerFast, GPT2TokenizerFast
+from datasets import concatenate_datasets
 import config as CFG
 from dataset_utils import train_val_test_split, preprocess
 from modules import CBL, RobertaCBL, GPT2CBL, BERTCBL
@@ -13,7 +14,7 @@ def load_tokenizer(backbone):
     if backbone == 'gpt2':
         tok = GPT2TokenizerFast.from_pretrained('gpt2'); tok.pad_token = tok.eos_token; return tok
     if backbone == 'bert':   return AutoTokenizer.from_pretrained('bert-base-uncased')
-    raise ValueError(f"Unknown backbone: {backbone}")
+    raise ValueError
 
 def build_prefix(labeling, dataset):
     d_name = dataset.replace('/', '_')
@@ -25,12 +26,6 @@ def apply_acc(similarity, labels, concept_set, dataset):
     concept_labels = np.array([get_labels(j, dataset) for j in range(len(concept_set))])
     matches = labels[:, None] == concept_labels[None, :]
     similarity = similarity.copy()
-    # safety mask shape
-    if matches.shape != similarity.shape:
-        min_r = min(matches.shape[0], similarity.shape[0])
-        min_c = min(matches.shape[1], similarity.shape[1])
-        matches = matches[:min_r, :min_c]
-        similarity = similarity[:min_r, :min_c]
     similarity[~matches] = 0.0
     np.maximum(similarity, 0.0, out=similarity)
     return similarity
@@ -47,8 +42,6 @@ def load_cbl(cbl_path, backbone, n_concepts, dropout=0.1):
             preLM = AutoModel.from_pretrained('gpt2').to(device)
         elif backbone=='bert':
             preLM = AutoModel.from_pretrained('bert-base-uncased').to(device)
-        else:
-            raise ValueError(f"Unknown backbone: {backbone}")
         preLM.eval()
         return ('cbl_only', cbl, preLM)
     else:
@@ -58,8 +51,6 @@ def load_cbl(cbl_path, backbone, n_concepts, dropout=0.1):
             model = GPT2CBL(n_concepts, dropout).to(device)
         elif backbone=='bert':
             model = BERTCBL(n_concepts, dropout).to(device)
-        else:
-            raise ValueError(f"Unknown backbone: {backbone}")
         model.load_state_dict(torch.load(cbl_path, map_location=device)); model.eval()
         return ('with_backbone', model, None)
 
@@ -74,26 +65,6 @@ def forward_cbl(batch, mode, model, preLM, backbone):
             z = model(batch)
     return z
 
-def load_split(dataset, split, backbone, max_length):
-    # always build consistent split via our helper
-    has_val = True  # giữ nguyên như train_CBL thường dùng
-    tr, va, te = train_val_test_split(dataset, CFG.dataset_config[dataset]["label_column"],
-                                      ratio=0.2, has_val=has_val)
-    if split == "train": ds = tr
-    elif split == "val": ds = va
-    elif split == "test": ds = te
-    else: raise ValueError("--split must be one of {train,val,test}")
-
-    tok = load_tokenizer(backbone)
-    ds = preprocess(ds, dataset,
-                    CFG.dataset_config[dataset]["text_column"],
-                    CFG.dataset_config[dataset]["label_column"])
-    enc = ds.map(lambda e: tok(e[CFG.dataset_config[dataset]["text_column"]],
-                               padding=True, truncation=True, max_length=max_length),
-                 batched=True, batch_size=len(ds))
-    enc = enc.remove_columns([CFG.dataset_config[dataset]["text_column"]])
-    return enc
-
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default="SetFit/sst2")
@@ -101,73 +72,60 @@ if __name__ == "__main__":
     ap.add_argument("--labeling", default="mpnet", choices=["mpnet","simcse","angle","llm"])
     ap.add_argument("--cbl_path", required=True)
     ap.add_argument("--acc_like_train", action="store_true",
-                    help="Áp ACC lên z_label giống lúc train_CBL (zero-out khác lớp, clip âm→0).")
-    ap.add_argument("--split", default="val", choices=["train","val","test"])
+                    help="áp ACC lên z_label giống lúc train_CBL")
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--max_length", type=int, default=512)
-    ap.add_argument("--topk", type=int, default=5, help="Top-k concept để in")
     args = ap.parse_args()
 
-    dataset = args.dataset
-    concept_set = CFG.concept_set[dataset]
-    concept_names = list(concept_set)  # đảm bảo index -> tên concept
-
     # 1) data
-    enc = load_split(dataset, args.split, args.backbone, args.max_length)
-    labels = np.array(enc[ CFG.dataset_config[dataset]["label_column"] ])
+    train_ds, val_ds, _ = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=False)
+    tokenizer = load_tokenizer(args.backbone)
+    val_ds = preprocess(val_ds, args.dataset, CFG.dataset_config[args.dataset]["text_column"], CFG.dataset_config[args.dataset]["label_column"])
+    enc_val = val_ds.map(lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]],
+                                             padding=True, truncation=True, max_length=args.max_length),
+                         batched=True, batch_size=len(val_ds))
+    enc_val = enc_val.remove_columns([CFG.dataset_config[args.dataset]["text_column"]])
+    enc_val = enc_val[:len(enc_val)]
+    labels_val = np.array(enc_val[CFG.dataset_config[args.dataset]["label_column"]])
 
-    # 2) load labels (ACS) và áp ACC nếu yêu cầu
-    prefix = build_prefix(args.labeling, dataset)
-    z_label_all = np.load(f"{prefix}/concept_labels_{args.split}.npy")
-
-    # đồng bộ số hàng giữa enc và z_label_all (phòng lệch split/seed)
-    min_len = min(len(enc["input_ids"]), z_label_all.shape[0])
-    if min_len == 0:
-        raise RuntimeError("Empty split or labels; check your files.")
-    # cắt dữ liệu về min_len
-    for k in list(enc.keys()):
-        enc[k] = enc[k][:min_len]
-    labels = labels[:min_len]
-    z_label_all = z_label_all[:min_len]
-
+    # 2) load labels (ACS) and apply ACC if requested
+    prefix = build_prefix(args.labeling, args.dataset)
+    z_label_val = np.load(f"{prefix}/concept_labels_val.npy")
+    concept_set = CFG.concept_set[args.dataset]
+    concept_names = list(concept_set)
     if args.acc_like_train:
-        z_label_all = apply_acc(z_label_all, labels, concept_set, dataset)
+        z_label_val = apply_acc(z_label_val, labels_val, concept_set, args.dataset)
 
     # 3) load CBL
     mode, model, preLM = load_cbl(args.cbl_path, args.backbone, len(concept_set))
 
     # 4) pick K random indices
-    idxs = random.sample(range(min_len), k=min(args.k, min_len))
-    batch = {
-        "input_ids": torch.tensor(np.array(enc["input_ids"])[idxs]).to(device),
-        "attention_mask": torch.tensor(np.array(enc["attention_mask"])[idxs]).to(device)
-    }
+    idxs = random.sample(range(len(enc_val['input_ids'])), k=min(args.k, len(enc_val['input_ids'])))
+    batch = {k: torch.tensor(np.array(v)[idxs]).to(device) for k, v in enc_val.items() if k in ["input_ids","attention_mask"]}
 
-    # 5) compute z_pred & gather z_label
+    # 5) compute z_pred
     z_pred = forward_cbl(batch, mode, model, preLM, args.backbone).detach().cpu().numpy()
-    z_label = z_label_all[idxs]
-    y_batch = labels[idxs]
+    z_label = z_label_val[idxs]
 
-    # normalize both for true cosine
-    z_pred_norm = z_pred / (np.linalg.norm(z_pred, axis=1, keepdims=True) + 1e-12)
+    # also normalized z_pred for cosine comparison
+    # normalize BOTH for true cosine comparison
+    z_pred_norm  = z_pred  / (np.linalg.norm(z_pred,  axis=1, keepdims=True) + 1e-12)
     z_label_norm = z_label / (np.linalg.norm(z_label, axis=1, keepdims=True) + 1e-12)
 
     # 6) print
-    print(f"\n=== Dump {len(idxs)} samples (split={args.split}) ===")
+    print(f"\n=== Dump {len(idxs)} samples ===")
     for i, gi in enumerate(idxs):
-        true_cos = float((z_pred_norm[i] * z_label_norm[i]).sum())
-        top_p_idx = z_pred[i].argsort()[-args.topk:][::-1]
-        top_l_idx = z_label[i].argsort()[-args.topk:][::-1]
+        cos = float((z_pred_norm[i] * z_label_norm[i]).sum())
 
-        top_p_named = [(concept_names[j], float(z_pred[i, j])) for j in top_p_idx]
-        top_l_named = [(concept_names[j], float(z_label[i, j])) for j in top_l_idx]
+        top_p = z_pred[i].argsort()[-5:][::-1]
+        top_l = z_label[i].argsort()[-5:][::-1]
 
-        # optional: top-k overlap rate (tên concept)
-        overlap = len(set(top_p_idx) & set(top_l_idx)) / float(args.topk)
+        print(f"\n[#{i} | global_id={gi} | y={labels_val[gi]} | cosine(z_pred_norm, z_label_norm)={cos:.4f}]")
 
-        print(f"\n[#{i} | global_id={gi} | y={y_batch[i]} | cosine(z_pred, z_label)={true_cos:.4f} | top{args.topk}_overlap={overlap:.2f}]")
-        print("  CBL raw top-{}:".format(args.topk), top_p_named)
-        print("  ACC/ACS top-{}:".format(args.topk), top_l_named)
+        # In TÊN concept thay vì chỉ số
+        print("  CBL raw top-5:", [(concept_names[j], float(z_pred[i, j])) for j in top_p])
+        print("  ACC/ACS top-5:", [(concept_names[j], float(z_label[i, j])) for j in top_l])
+
 
     # 7) optional save
     np.save("dump_z_pred.npy", z_pred)
