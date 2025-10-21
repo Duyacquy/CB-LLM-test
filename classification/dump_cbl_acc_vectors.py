@@ -78,7 +78,7 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     # 1) data
-    train_ds, val_ds, _ = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=False)
+    train_ds, val_ds, _ = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=True)
     tokenizer = load_tokenizer(args.backbone)
     val_ds = preprocess(val_ds, args.dataset, CFG.dataset_config[args.dataset]["text_column"], CFG.dataset_config[args.dataset]["label_column"])
     enc_val = val_ds.map(lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]],
