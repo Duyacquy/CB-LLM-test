@@ -70,6 +70,7 @@ if __name__ == "__main__":
         raise Exception("backbone should be roberta or gpt2")
 
     map_batch_size = min(1024, len(train_dataset), len(val_dataset), len(test_dataset))
+    print("Map batch size: ", map_batch_size)
     print("preprocessing datasets...")
 
     train_dataset = preprocess(train_dataset, args.dataset, CFG.dataset_config[args.dataset]["text_column"], CFG.dataset_config[args.dataset]["label_column"])
@@ -77,14 +78,14 @@ if __name__ == "__main__":
     test_dataset = preprocess(test_dataset, args.dataset, CFG.dataset_config[args.dataset]["text_column"], CFG.dataset_config[args.dataset]["label_column"])
 
     encoded_train_dataset = train_dataset.map(
-        lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]], padding=True, truncation=True, max_length=args.max_length), batched=True,
+        lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]], padding='max_length', truncation=True, max_length=args.max_length), batched=True,
         batch_size=map_batch_size)
     encoded_val_dataset = val_dataset.map(
-        lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]], padding=True, truncation=True, max_length=args.max_length), batched=True,
+        lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]], padding='max_length', truncation=True, max_length=args.max_length), batched=True,
         batch_size=map_batch_size)
     
     encoded_test_dataset = test_dataset.map(
-        lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]], padding=True, truncation=True, max_length=args.max_length), batched=True,
+        lambda e: tokenizer(e[CFG.dataset_config[args.dataset]["text_column"]], padding='max_length', truncation=True, max_length=args.max_length), batched=True,
         batch_size=map_batch_size)
     
     
