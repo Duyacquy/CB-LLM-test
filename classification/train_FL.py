@@ -56,7 +56,7 @@ if __name__ == "__main__":
     
     print("--------------------------------TRAIN_FL--------------------------------")
     print("loading data...")
-    train_dataset, val_dataset, test_dataset = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=False)
+    train_dataset, val_dataset, test_dataset = train_val_test_split(args.dataset, CFG.dataset_config[args.dataset]["label_column"], ratio=0.2, has_val=True)
     print("tokenizing...")
 
     if 'roberta' in backbone:
