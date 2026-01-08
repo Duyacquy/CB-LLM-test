@@ -80,6 +80,23 @@ def preprocess_label_column(dataset, dataset_name, label_column):
         dataset = cast_type(dataset, label_column, "int32")
         dataset = dataset.map(reformat_label, batched=True)
     
+    elif dataset_name == "Duyacquy/Pubmed_20k":
+        label_map = {
+            "BACKGROUND": 0, 
+            "OBJECTIVE": 1, 
+            "METHODS": 2, 
+            "RESULTS": 3, 
+            "CONCLUSIONS": 4
+        }
+        
+        def map_pubmed_labels(rows):
+            return {label_column: [label_map[l.strip()] for l in rows[label_column]]}
+
+        print(f"Mapping text labels for {dataset_name} to integers...")
+        dataset = dataset.map(map_pubmed_labels, batched=True)
+        # Cast sang int32 để đảm bảo tương thích với torch
+        dataset = cast_type(dataset, label_column, "int32")
+
     return dataset
 
 
