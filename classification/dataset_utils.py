@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 import config as CFG
 import pandas as pd
-from datasets import Dataset, Value
+from datasets import Dataset, Value, ClassLabel
 
 from config import *
 
@@ -22,28 +22,34 @@ def train_val_test_split(dataset_name, label_column, ratio=0.2, has_val=False):
     val_dataset = None
 
     if has_val:
-        val_dataset = load_dataset(dataset_name, split="validation")
-    else:
-        print("No validation set found, using part of training set as validation set. Ratio 80/20 for train/validation.")
-        from datasets import ClassLabel
+        try:
+            val_dataset = load_dataset(dataset_name, split="validation")
+            print("Successfully loaded 'validation' split from source.")
+        except Exception as e:
+            print(f"Warning: Could not load 'validation' split ({str(e)}). Switching to manual split.")
+            val_dataset = None
 
-        labels = concepts_from_labels[dataset_name]
+    if val_dataset is None:
+        print("Using part of training set as validation set. Ratio 80/20 for train/validation.")
+        
+        labels = concepts_from_labels.get(dataset_name)
         
         if labels is None:
-            # create a temporary labels list if not provided
             print(f"No labels provided for {dataset_name}, extracting unique labels from the dataset.")
             labels = train_dataset.unique(label_column)
             labels = [str(label) for label in labels]
 
         train_dataset = train_dataset.cast_column(label_column, ClassLabel(names=labels))
         test_dataset = test_dataset.cast_column(label_column, ClassLabel(names=labels))
+        
         train_val_split = train_dataset.train_test_split(test_size=ratio, seed=42, stratify_by_column=label_column)
 
         train_dataset = train_val_split["train"]
         val_dataset = train_val_split["test"]
 
     print(f"Train dataset size: {len(train_dataset)}")
-    print(f"Validation dataset size: {len(val_dataset)}")
+    if val_dataset:
+        print(f"Validation dataset size: {len(val_dataset)}")
     print(f"Test dataset size: {len(test_dataset)}")
 
     print(f"Successfully loaded dataset {dataset_name}")
@@ -53,13 +59,12 @@ def train_val_test_split(dataset_name, label_column, ratio=0.2, has_val=False):
 
 def preprocess(dataset, dataset_name, text_column, label_column):
     dataset = clean_dataset_with_extra_columns(dataset, text_column, label_column)
-    dataset = clean_dataset_with_multiple_labels_per_row(dataset, text_column, label_column)
+    # dataset = clean_dataset_with_multiple_labels_per_row(dataset, text_column, label_column)
     dataset = preprocess_label_column(dataset, dataset_name, label_column)
 
     dataset = dataset.filter(lambda x: x[text_column] is not None and x[text_column] != "")
 
     return dataset
-
 
 def preprocess_label_column(dataset, dataset_name, label_column):
 
@@ -90,7 +95,12 @@ def preprocess_label_column(dataset, dataset_name, label_column):
         }
         
         def map_pubmed_labels(rows):
-            return {label_column: [label_map[l.strip()] for l in rows[label_column]]}
+            first_label = rows[label_column][0]
+            
+            if isinstance(first_label, int):
+                return {label_column: rows[label_column]}
+            else:
+                return {label_column: [label_map[l.strip()] for l in rows[label_column]]}
 
         print(f"Mapping text labels for {dataset_name} to integers...")
         dataset = dataset.map(map_pubmed_labels, batched=True)
