@@ -71,6 +71,8 @@ def get_labels(n, d):
         return ecom_labels(n)
     if d == "Duyacquy/Stack_overflow_question":
         return stack_over_flow_labels(n)
+    if d == "Duyacquy/Pubmed_20k":
+        return pubmed_labels(n)
 
     raise(ValueError)
 
@@ -154,6 +156,13 @@ def ecom_labels(n):
 
 def stack_over_flow_labels(n):
     boundaries = [20, 40, 60]
+    for i, bound in enumerate(boundaries):
+        if n < bound:
+            return i
+    return len(boundaries)
+
+def pubmed_labels(n):
+    boundaries = [30, 60, 90, 120, 150]
     for i, bound in enumerate(boundaries):
         if n < bound:
             return i
